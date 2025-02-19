@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { SessionAnalysis } from '../types';
+import api from './api';
 
 export const categories = [
   'entertainment',
@@ -140,17 +141,6 @@ Format your response EXACTLY as follows (replace placeholders with actual values
     const jsonStr = jsonMatch[0];
     const analysis = JSON.parse(jsonStr);
 
-    // Save to MongoDB
-    try {
-      await updateKeywordsAndUrls(
-        analysis.category,
-        analysis.keywords || [],
-        analysis.urls || []
-      );
-    } catch (error) {
-      console.error('Failed to save analysis to MongoDB:', error);
-    }
-
     // Validate and sanitize the response
     const sanitizedAnalysis: SessionAnalysis = {
       category: categories.includes(analysis.category as any) 
@@ -163,22 +153,28 @@ Format your response EXACTLY as follows (replace placeholders with actual values
         ? analysis.keywords.filter(keyword => typeof keyword === 'string').slice(0, 20)
         : [],
       urls: Array.isArray(analysis.urls)
-        ? [...new Set([...urls, ...analysis.urls.filter(url => typeof url === 'string')])]
-        : urls,
+        ? analysis.urls.filter(url => typeof url === 'string')
+        : [],
       summary: typeof analysis.summary === 'string'
         ? analysis.summary.slice(0, 300)
         : 'No summary available'
     };
 
+    // Save to learning system
+    try {
+      await api.post('/api/learning-data', {
+        category: sanitizedAnalysis.category,
+        keywords: sanitizedAnalysis.keywords,
+        urls: sanitizedAnalysis.urls,
+        confidence: 0.8 // You can adjust this based on your confidence calculation
+      });
+    } catch (error) {
+      console.error('Failed to save to learning system:', error);
+    }
+
     return sanitizedAnalysis;
   } catch (error) {
     console.error('Error processing text:', error);
-    return {
-      category: categories[0],
-      topics: [],
-      keywords: [],
-      urls: [],
-      summary: 'Analysis failed due to technical issues. Please try again.'
-    };
+    return null;
   }
 }

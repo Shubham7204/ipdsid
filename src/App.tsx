@@ -7,6 +7,7 @@ import type { SessionAnalysis } from './types';
 import { DataView } from './pages/DataView';
 import { AuthForm } from './components/AuthForm';
 import { useAuth } from './context/AuthContext';
+import { useLearningData } from './hooks/useLearningData';
 
 function App() {
   const { isAuthenticated, logout } = useAuth();
@@ -20,6 +21,7 @@ function App() {
   const captureInterval = useRef<number | null>(null);
   const worker = useRef<any>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const { learningData, updateLearningData } = useLearningData();
 
   useEffect(() => {
     const initWorker = async () => {
@@ -50,6 +52,14 @@ function App() {
     setReport('');
   };
 
+  const processTextAndLearn = async (text: string, isReport = false) => {
+    const analysis = await processText(text, isReport);
+    if (analysis) {
+      await updateLearningData(analysis);
+    }
+    return analysis;
+  };
+
   const startCapture = async () => {
     try {
       setError('');
@@ -72,7 +82,7 @@ function App() {
                 const { data: { text } } = await worker.current.recognize(screenshot);
                 if (text && text.trim()) {
                   setSessionData(prev => [...prev, text]);
-                  const analysis = await processText(text);
+                  const analysis = await processTextAndLearn(text);
                   if (analysis) {
                     setAnalysisData(prev => [...prev, analysis]);
                   }
@@ -107,7 +117,7 @@ function App() {
     try {
       setError('');
       const allText = sessionData.join('\n');
-      const analysis = await processText(allText, true);
+      const analysis = await processTextAndLearn(allText, true);
       if (analysis) {
         setReport(JSON.stringify(analysis, null, 2));
       }
@@ -116,6 +126,38 @@ function App() {
       setError('Failed to generate report. Please try again.');
     }
   };
+
+  const renderLearningProgress = () => (
+    <div className="bg-white rounded-lg shadow-lg p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Database className="text-purple-500" />
+        <h2 className="text-xl font-semibold">Learning Progress</h2>
+      </div>
+      <div className="space-y-4">
+        {learningData.map((data) => (
+          <div key={data.category} className="border-b border-gray-100 pb-4">
+            <div className="flex justify-between items-center">
+              <h3 className="font-medium capitalize">{data.category}</h3>
+              <span className="text-sm text-gray-500">
+                Frequency: {data.frequency}
+              </span>
+            </div>
+            <div className="mt-2">
+              <div className="text-sm text-gray-600">
+                Confidence: {(data.confidence * 100).toFixed(1)}%
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                <div
+                  className="bg-purple-500 h-2 rounded-full"
+                  style={{ width: `${data.confidence * 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   if (!isAuthenticated) {
     return <AuthForm />;
@@ -270,6 +312,7 @@ function App() {
 
           {/* Analysis Dashboard */}
           <div className="space-y-6">
+            {renderLearningProgress()}
             {/* Extracted URLs */}
             <div className="bg-white rounded-lg shadow-lg p-6">
               <div className="flex items-center gap-2 mb-4">
