@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, AlertCircle, FileText, Link2, Tag, BarChart, ChevronDown, ChevronRight, Download } from 'lucide-react';
+import { Play, Pause, AlertCircle, FileText, Link2, Tag, BarChart, ChevronDown, ChevronRight, Download, Image } from 'lucide-react';
 import { createWorker } from 'tesseract.js';
 import { captureScreen, initializeCapture } from '../utils/screenCapture';
 import { processText } from '../utils/textProcessing';
@@ -13,8 +13,12 @@ import { api } from '../services/api';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { jsPDF } from 'jspdf';
+import { SessionHistory } from '../components/SessionHistory';
+import { LearningProgress } from '../components/LearningProgress';
+import { CombinedKnowledge } from '../components/CombinedKnowledge';
 
 export function Dashboard() {
+  const [expandedSession, setExpandedSession] = useState<string | null>(null);
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [isCapturing, setIsCapturing] = useState(false);
@@ -28,7 +32,7 @@ export function Dashboard() {
   const streamRef = useRef<MediaStream | null>(null);
   const { learningData, updateLearningData } = useLearningData();
   const { frames = [], saveFrame } = useFrames();
-  const { currentSession, startSession, endSession, sessions } = useSession();
+  const { currentSession, startSession, endSession, sessions, isLoading: sessionsLoading } = useSession();
 
   useEffect(() => {
     const initWorker = async () => {
@@ -171,65 +175,6 @@ export function Dashboard() {
     }
   };
 
-  const renderLearningProgress = () => (
-    <div className="bg-white rounded-lg shadow-lg p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <h2 className="text-xl font-semibold">Learning Progress</h2>
-      </div>
-      <div className="space-y-4">
-        {learningData.map((data) => (
-          <div key={data.category} className="border-b border-gray-100 pb-4">
-            <div className="flex justify-between items-center">
-              <h3 className="font-medium capitalize">{data.category}</h3>
-              <span className="text-sm text-gray-500">
-                Frequency: {data.frequency}
-              </span>
-            </div>
-            <div className="mt-2">
-              <div className="text-sm text-gray-600">
-                Confidence: {(data.confidence * 100).toFixed(1)}%
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                <div
-                  className="bg-purple-500 h-2 rounded-full"
-                  style={{ width: `${data.confidence * 100}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  const renderFrames = () => {
-    if (!Array.isArray(frames)) {
-      console.error('Frames is not an array:', frames);
-      return null;
-    }
-
-    return frames.map((frame) => (
-      <div key={frame._id} className="border rounded-lg p-4">
-        <img 
-          src={frame.imageUrl} 
-          alt={`Capture at ${new Date(frame.timestamp).toLocaleString()}`}
-          className="w-full h-48 object-cover rounded mb-2"
-        />
-        <div className="text-sm text-gray-600">
-          <p>Category: {frame.category}</p>
-          <p>Time: {new Date(frame.timestamp).toLocaleString()}</p>
-          <div className="flex flex-wrap gap-1 mt-1">
-            {frame.keywords.map((keyword, i) => (
-              <span key={i} className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
-                {keyword}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-    ));
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('en-US', {
       dateStyle: 'medium',
@@ -311,8 +256,6 @@ ${session.report.summary}
   };
 
   const renderSessionHistory = () => {
-    const [expandedSession, setExpandedSession] = useState<string | null>(null);
-
     if (!Array.isArray(sessions) || sessions.length === 0) {
       return (
         <div className="text-gray-500 text-center py-4">
@@ -395,62 +338,51 @@ ${session.report.summary}
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Control Panel */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <div className="flex justify-between items-center mb-4">
-                <div className="flex gap-4">
-                  <button
-                    onClick={isCapturing ? stopCapture : startCapture}
-                    disabled={!!error}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-                      isCapturing 
-                        ? 'bg-red-500 hover:bg-red-600 text-white'
-                        : 'bg-blue-500 hover:bg-blue-600 text-white'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {isCapturing ? (
-                      <>
-                        <Pause size={20} />
-                        Stop Capture
-                      </>
-                    ) : (
-                      <>
-                        <Play size={20} />
-                        Start Capture
-                      </>
-                    )}
-                  </button>
-                  
-                  <button
-                    onClick={generateReport}
-                    disabled={sessionData.length === 0 || !!error}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <FileText size={20} />
-                    Generate Report
-                  </button>
-                </div>
-              </div>
-
+      <div className="container mx-auto py-6 px-4">
+        {/* Screen Capture Controls */}
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Screen Capture</h2>
+            <div className="flex items-center gap-4">
               {error && (
-                <div className="flex items-center gap-2 text-red-600 mb-4">
-                  <AlertCircle size={20} />
-                  <p>{error}</p>
+                <div className="flex items-center text-red-600">
+                  <AlertCircle className="w-5 h-5 mr-2" />
+                  <span>{error}</span>
                 </div>
               )}
-              
-              {!hasPermission && !error && (
-                <div className="flex items-center gap-2 text-amber-600 mb-4">
-                  <AlertCircle size={20} />
-                  <p>Screen capture permission required</p>
-                </div>
-              )}
+              <button
+                onClick={isCapturing ? stopCapture : startCapture}
+                className={`flex items-center px-4 py-2 rounded-lg ${
+                  isCapturing
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {isCapturing ? (
+                  <>
+                    <Pause className="w-5 h-5 mr-2" />
+                    Stop Capture
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-5 h-5 mr-2" />
+                    Start Capture
+                  </>
+                )}
+              </button>
             </div>
+          </div>
+          {isCapturing && (
+            <div className="text-sm text-gray-600">
+              Screen capture is active. Learning from your screen content...
+            </div>
+          )}
+        </div>
 
-            {/* Session Data */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column */}
+          <div className="space-y-6">
+            {/* Raw Session Data */}
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h2 className="text-xl font-semibold mb-4">Raw Session Data</h2>
               <div className="bg-gray-50 p-4 rounded-lg max-h-96 overflow-y-auto">
@@ -466,93 +398,61 @@ ${session.report.summary}
                 )}
               </div>
             </div>
+
+            <LearningProgress />
+            <SessionHistory />
           </div>
 
-          {/* Analysis Dashboard */}
+          {/* Right Column */}
           <div className="space-y-6">
-            {renderLearningProgress()}
+            <CombinedKnowledge />
             
-            {/* Extracted URLs */}
+            {/* Captured Frames Section */}
             <div className="bg-white rounded-lg shadow-lg p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Link2 className="text-blue-500" />
-                <h2 className="text-xl font-semibold">Detected URLs</h2>
-              </div>
-              <div className="space-y-2">
-                {analysisData.flatMap(data => data.urls).map((url, index) => (
-                  <div key={index} className="text-blue-600 hover:underline">
-                    <a href={url} target="_blank" rel="noopener noreferrer">{url}</a>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Detected Keywords */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Tag className="text-green-500" />
-                <h2 className="text-xl font-semibold">Detected Keywords</h2>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {analysisData.flatMap(data => data.keywords).map((keyword, index) => (
-                  <span
-                    key={index}
-                    className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm"
-                  >
-                    {keyword}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Category Distribution */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <BarChart className="text-purple-500" />
-                <h2 className="text-xl font-semibold">Category Distribution</h2>
-              </div>
-              {analysisData.map((data, index) => (
-                <div key={index} className="mb-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-700 capitalize">
-                      {data.category}
-                    </span>
-                  </div>
-                  <div className="mt-2">
-                    <div className="text-sm text-gray-600">
-                      Confidence: {(0.8 * 100).toFixed(1)}%
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                      <div
-                        className="bg-purple-500 h-2 rounded-full"
-                        style={{ width: `${0.8 * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Session Report */}
-            {renderCurrentSessionReport()}
-
-            {/* Add Captured Frames Section */}
-            <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
-              <h2 className="text-xl font-semibold mb-4">Captured Frames</h2>
-              <div className="frames-container">
-                {renderFrames()}
-              </div>
-            </div>
-
-            {/* Session History */}
-            <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold">Session History</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <Image className="text-indigo-500" />
+                  Recent Captures
+                </h2>
                 <span className="text-sm text-gray-500">
-                  {sessions.length} {sessions.length === 1 ? 'session' : 'sessions'} recorded
+                  {frames.length} frames captured
                 </span>
               </div>
-              {renderSessionHistory()}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {frames.map((frame, index) => (
+                  <div key={frame._id} className="border rounded-lg p-4 bg-white shadow-sm">
+                    <img
+                      src={frame.imageUrl}
+                      alt={`Frame ${index + 1}`}
+                      className="w-full h-48 object-cover rounded mb-3"
+                      loading="lazy"
+                    />
+                    <div className="space-y-2">
+                      <p className="text-sm text-gray-500">
+                        {new Date(frame.timestamp).toLocaleString()}
+                      </p>
+                      {frame.category && (
+                        <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
+                          {frame.category}
+                        </span>
+                      )}
+                      {frame.keywords && frame.keywords.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {frame.keywords.map((keyword, idx) => (
+                            <span
+                              key={idx}
+                              className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded"
+                            >
+                              {keyword}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

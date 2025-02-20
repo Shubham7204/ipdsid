@@ -1,3 +1,4 @@
+import React from 'react';
 import { DataTable } from './DataTable';
 import { useLearningData } from '../hooks/useLearningData';
 import { categories, commonUrls, keywordsByCategory } from '../utils/textProcessing';
@@ -14,62 +15,93 @@ export function DataOverview() {
   ]);
 
   // Prepare learned data
-  const learnedHeaders = ['Category', 'Keywords', 'URLs', 'Frequency', 'Confidence'];
-  const learnedRows = learningData.map(data => [
-    data.category,
-    data.keywords.join(', '),
-    data.urls.join(', '),
-    data.frequency.toString(),
-    (data.confidence * 100).toFixed(1) + '%'
-  ]);
+  const learnedHeaders = ['Category', 'Keywords', 'URLs', 'Frequency'];
+  const learnedRows = learningData ? 
+    learningData.categories.map(cat => {
+      const categoryKeywords = learningData.keywords
+        .filter(k => k.category === cat.name)
+        .map(k => k.keyword)
+        .join(', ');
+      
+      const categoryUrls = learningData.urls
+        .filter(u => u.category === cat.name)
+        .map(u => u.url)
+        .join(', ');
+      
+      return [
+        cat.name,
+        categoryKeywords,
+        categoryUrls,
+        cat.count.toString()
+      ];
+    }) : [];
 
   // Prepare combined data
-  const combinedHeaders = ['Category', 'All Keywords', 'All URLs'];
+  const combinedHeaders = ['Category', 'All Keywords', 'All URLs', 'Frequency'];
   const combinedRows = categories.map(category => {
-    const learningDataForCategory = learningData.find(data => data.category === category);
+    const categoryData = learningData?.categories.find(c => c.name === category);
+    const frequency = categoryData?.count || 0;
+    
+    const learnedKeywords = learningData?.keywords
+      .filter(k => k.category === category)
+      .map(k => k.keyword) || [];
+    
     const allKeywords = new Set([
       ...keywordsByCategory[category],
-      ...(learningDataForCategory?.keywords || [])
+      ...learnedKeywords
     ]);
+
+    const learnedUrls = learningData?.urls
+      .filter(u => u.category === category)
+      .map(u => u.url) || [];
+
     const allUrls = new Set([
       ...commonUrls[category],
-      ...(learningDataForCategory?.urls || [])
+      ...learnedUrls
     ]);
 
     return [
       category,
       Array.from(allKeywords).join(', '),
-      Array.from(allUrls).join(', ')
+      Array.from(allUrls).join(', '),
+      frequency.toString()
     ];
   });
 
   if (isLoading) {
-    return <div className="text-center py-4">Loading data...</div>;
+    return (
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <div className="text-center py-4">Loading data...</div>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="text-red-500 text-center py-4">{error}</div>;
+    return (
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <div className="text-center py-4 text-red-600">Error loading data</div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-8">
-      <DataTable 
-        title="Pre-fed Data Overview"
-        headers={preFedHeaders}
-        rows={preFedRows}
-      />
+      <div>
+        <h3 className="text-lg font-medium mb-4">Pre-fed Knowledge</h3>
+        <DataTable headers={preFedHeaders} rows={preFedRows} />
+      </div>
 
-      <DataTable 
-        title="Learned Data Overview"
-        headers={learnedHeaders}
-        rows={learnedRows}
-      />
+      {learningData && (
+        <div>
+          <h3 className="text-lg font-medium mb-4">Learned Knowledge</h3>
+          <DataTable headers={learnedHeaders} rows={learnedRows} />
+        </div>
+      )}
 
-      <DataTable 
-        title="Combined Data Overview"
-        headers={combinedHeaders}
-        rows={combinedRows}
-      />
+      <div>
+        <h3 className="text-lg font-medium mb-4">Combined Knowledge</h3>
+        <DataTable headers={combinedHeaders} rows={combinedRows} />
+      </div>
     </div>
   );
 } 

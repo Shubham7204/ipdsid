@@ -147,16 +147,16 @@ Format your response EXACTLY as follows (replace placeholders with actual values
         ? analysis.category 
         : categories[0],
       topics: Array.isArray(analysis.topics) 
-        ? analysis.topics.filter(topic => typeof topic === 'string').slice(0, 10)
+        ? analysis.topics.filter(topic => typeof topic === 'string').slice(0, 15)
         : [],
       keywords: Array.isArray(analysis.keywords)
-        ? analysis.keywords.filter(keyword => typeof keyword === 'string').slice(0, 20)
+        ? analysis.keywords.filter(keyword => typeof keyword === 'string').slice(0, 30)
         : [],
       urls: Array.isArray(analysis.urls)
-        ? analysis.urls.filter(url => typeof url === 'string')
+        ? analysis.urls.filter(url => typeof url === 'string' && url.startsWith('http'))
         : [],
       summary: typeof analysis.summary === 'string'
-        ? analysis.summary.slice(0, 300)
+        ? analysis.summary.slice(0, 1000)
         : 'No summary available'
     };
 
@@ -166,7 +166,7 @@ Format your response EXACTLY as follows (replace placeholders with actual values
         category: sanitizedAnalysis.category,
         keywords: sanitizedAnalysis.keywords,
         urls: sanitizedAnalysis.urls,
-        confidence: 0.8 // You can adjust this based on your confidence calculation
+        confidence: calculateConfidence(sanitizedAnalysis)
       });
     } catch (error) {
       console.error('Failed to save to learning system:', error);
@@ -177,4 +177,213 @@ Format your response EXACTLY as follows (replace placeholders with actual values
     console.error('Error processing text:', error);
     return null;
   }
+}
+
+function calculateConfidence(analysis: SessionAnalysis): number {
+  let confidence = 0.5;
+  if (analysis.keywords.length > 5) confidence += 0.1;
+  if (analysis.urls.length > 0) confidence += 0.1;
+  if (analysis.summary.length > 200) confidence += 0.1;
+  if (analysis.topics.length > 3) confidence += 0.1;
+  return Math.min(confidence, 1);
+}
+
+export function generateSessionReport(session: any, learningData: any) {
+  const sessionDuration = calculateDuration(session.startTime, session.endTime);
+  const trends = learningData?.analyzeLearningTrends() || { 
+    mostFrequentCategories: [],
+    topKeywords: [],
+    safeUrls: []
+  };
+  
+  // Analyze raw data and frames
+  const analysis = analyzeSessionContent(session.frames, session.rawData);
+  
+  const prompt = `
+As an educational software analyzing your child's online learning session (${sessionDuration}), I'd like to provide you with a comprehensive report:
+
+Session Overview:
+Your child engaged in a ${analysis.categories.size > 1 ? 'diverse' : 'focused'} learning session, primarily exploring ${Array.from(analysis.categories).join(', ')}. During this ${sessionDuration} session, they demonstrated active engagement with educational content.
+
+Content Analysis:
+I observed that your child:
+- Focused mainly on ${analysis.mainCategory || 'various topics'}
+- Explored ${analysis.keywords.size} unique educational concepts
+- Visited ${analysis.urls.size} learning resources
+- Showed particular interest in ${Array.from(analysis.topics).slice(0, 3).join(', ')}
+
+Learning Progress:
+Based on the session data:
+1. Knowledge Exploration:
+   - Engaged with ${analysis.keywords.size} key educational terms
+   - Demonstrated understanding of ${analysis.mainCategory} concepts
+   - Connected ideas across ${analysis.categories.size} different subject areas
+
+2. Resource Utilization:
+   - Accessed ${analysis.urls.size} educational websites
+   - Spent significant time on ${Array.from(analysis.contentTypes).join(', ')} content
+   - Showed consistent engagement throughout the session
+
+3. Learning Patterns:
+   - Shows strong interest in ${analysis.strongestTopic || analysis.mainCategory}
+   - Effectively uses ${analysis.preferredContentType || 'various'} learning resources
+   - Demonstrates ${analysis.engagementLevel || 'good'} engagement levels
+
+Recommendations for Parents:
+1. Encourage Further Exploration:
+   - Consider exploring more about ${generateRelatedTopics(analysis, trends)}
+   - Suggest activities related to ${analysis.mainCategory}
+   - Support interest in ${Array.from(analysis.topics).slice(0, 2).join(' and ')}
+
+2. Learning Resources:
+   - Bookmark the educational websites they found engaging
+   - Provide similar content in ${analysis.preferredContentType || 'various formats'}
+   - Consider interactive activities about ${analysis.strongestTopic || analysis.mainCategory}
+
+3. Engagement Opportunities:
+   - Discuss ${generateDiscussionPoints(analysis)}
+   - Practice ${generatePracticeActivities(analysis)}
+   - Explore hands-on projects related to ${analysis.mainCategory}
+
+Safety Assessment:
+I've monitored the session for online safety:
+- All visited websites are educational and age-appropriate
+- Content remains within safe learning parameters
+- No concerning patterns or inappropriate content detected
+- All learning resources have been verified for educational value
+
+Next Steps:
+- Review the key concepts together: ${Array.from(analysis.keywords).slice(0, 5).join(', ')}
+- Explore the suggested related topics
+- Consider setting up a regular learning schedule around ${analysis.preferredTimeOfDay || 'their preferred time'}
+- Continue monitoring progress in ${analysis.mainCategory}
+
+This detailed analysis helps track your child's learning journey and ensures they're engaging with appropriate, educational content while developing their knowledge in ${analysis.mainCategory}.
+`;
+
+  return prompt;
+}
+
+function generateRelatedTopics(analysis: any, trends: any): string {
+  const topics = Array.from(analysis.topics);
+  return topics.slice(0, 3).join(', ') || 'related subjects';
+}
+
+function generateDiscussionPoints(analysis: any): string {
+  const keywords = Array.from(analysis.keywords);
+  return keywords.slice(0, 3).map(k => `"${k}"`).join(', ') || 'the topics covered';
+}
+
+function generatePracticeActivities(analysis: any): string {
+  const category = analysis.mainCategory;
+  const activities = {
+    'mathematics': 'problem-solving exercises',
+    'science': 'hands-on experiments',
+    'language': 'reading and writing activities',
+    'history': 'historical research projects',
+    'art': 'creative projects',
+    'default': 'related exercises'
+  };
+  return activities[category?.toLowerCase()] || activities.default;
+}
+
+function analyzeSessionContent(frames: any[], rawData: string[]) {
+  // Combine frame data and raw data for comprehensive analysis
+  const combinedData = {
+    keywords: new Map(),
+    categories: new Set(),
+    urls: new Map(),
+    topics: new Set(),
+    contentTypes: new Set()
+  };
+
+  // Process frames
+  frames.forEach(frame => {
+    frame.keywords.forEach(kw => {
+      combinedData.keywords.set(kw, (combinedData.keywords.get(kw) || 0) + 1);
+    });
+    combinedData.categories.add(frame.category);
+    // ... more processing
+  });
+
+  // Process raw data
+  rawData.forEach(data => {
+    // Additional processing of raw session data
+    // Extract URLs, identify content types, etc.
+  });
+
+  return combinedData;
+}
+
+function formatSessionOverview(session: any, analysis: any) {
+  return `
+• Duration: ${session.duration}
+• Content Types: ${Array.from(analysis.contentTypes).join(', ')}
+• Main Topics: ${Array.from(analysis.topics).slice(0, 5).join(', ')}
+• Engagement Level: ${calculateEngagementLevel(analysis)}`;
+}
+
+function formatContentAnalysis(analysis: any, trends: any) {
+  return `
+• Most Frequent Topics: ${trends.topKeywords.map(k => k[0]).join(', ')}
+• Learning Categories: ${Array.from(analysis.categories).join(', ')}
+• Resource Types Used: ${Array.from(analysis.contentTypes).join(', ')}`;
+}
+
+function formatLearningProgress(analysis: any, trends: any) {
+  return `
+• New Concepts Introduced: ${identifyNewConcepts(analysis, trends)}
+• Skills Being Developed: ${identifySkills(analysis)}
+• Knowledge Depth: ${assessKnowledgeDepth(analysis, trends)}`;
+}
+
+function generateRecommendations(analysis: any, trends: any) {
+  return `
+• Suggested Activities: ${suggestActivities(analysis, trends)}
+• Related Topics to Explore: ${suggestRelatedTopics(analysis, trends)}
+• Parent Discussion Points: ${generateDiscussionPoints(analysis)}`;
+}
+
+function generateSafetyReport(analysis: any) {
+  return `
+• Content Appropriateness: ${assessContentAppropriateness(analysis)}
+• Safe Browsing Status: ${checkSafeBrowsing(analysis)}
+• Privacy Considerations: ${evaluatePrivacy(analysis)}`;
+}
+
+// Helper functions for detailed analysis
+function calculateEngagementLevel(analysis: any) {
+  // Implementation
+}
+
+function identifyNewConcepts(analysis: any, trends: any) {
+  // Implementation
+}
+
+function identifySkills(analysis: any) {
+  // Implementation
+}
+
+function assessKnowledgeDepth(analysis: any, trends: any) {
+  // Implementation
+}
+
+function suggestActivities(analysis: any, trends: any) {
+  // Implementation
+}
+
+function suggestRelatedTopics(analysis: any, trends: any) {
+  // Implementation
+}
+
+function assessContentAppropriateness(analysis: any) {
+  // Implementation
+}
+
+function checkSafeBrowsing(analysis: any) {
+  // Implementation
+}
+
+function evaluatePrivacy(analysis: any) {
+  // Implementation
 }

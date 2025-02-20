@@ -13,6 +13,9 @@ import { Session } from './models/Session.js';
 import multer from 'multer';
 import { authenticateToken } from './middleware/auth.js';
 import PDFDocument from 'pdfkit';
+import learningDataRouter from './routes/learningData.js';
+import framesRouter from './routes/frames.js';
+import sessionsRouter from './routes/sessions.js';
 
 dotenv.config();
 
@@ -135,9 +138,19 @@ app.get('/api/analysis', authenticateToken, async (req, res) => {
 // Learning data routes
 app.get('/learning-data', authenticateToken, async (req, res) => {
   try {
-    const learningData = await LearningData.find({ userId: req.user.id });
-    res.json(learningData);
+    let learningData = await LearningData.findOne({ userId: req.user._id });
+    
+    if (!learningData) {
+      learningData = await LearningData.create({ userId: req.user._id });
+    }
+    
+    res.json({
+      categories: Object.fromEntries(learningData.categories),
+      keywords: Object.fromEntries(learningData.keywords),
+      lastUpdated: learningData.lastUpdated
+    });
   } catch (error) {
+    console.error('Error fetching learning data:', error);
     res.status(500).json({ error: 'Failed to fetch learning data' });
   }
 });
@@ -152,6 +165,42 @@ app.post('/learning-data', authenticateToken, async (req, res) => {
     res.json(learningData);
   } catch (error) {
     res.status(500).json({ error: 'Failed to save learning data' });
+  }
+});
+
+// Update learning data
+app.post('/learning-data/update', authenticateToken, async (req, res) => {
+  try {
+    const { category, keywords } = req.body;
+    let learningData = await LearningData.findOne({ userId: req.user._id });
+    
+    if (!learningData) {
+      learningData = new LearningData({ userId: req.user._id });
+    }
+    
+    // Update category frequency
+    if (category) {
+      const currentCount = learningData.categories.get(category) || 0;
+      learningData.categories.set(category, currentCount + 1);
+    }
+    
+    // Update keywords frequency
+    keywords.forEach(keyword => {
+      const currentCount = learningData.keywords.get(keyword) || 0;
+      learningData.keywords.set(keyword, currentCount + 1);
+    });
+    
+    learningData.lastUpdated = new Date();
+    await learningData.save();
+    
+    res.json({
+      categories: Object.fromEntries(learningData.categories),
+      keywords: Object.fromEntries(learningData.keywords),
+      lastUpdated: learningData.lastUpdated
+    });
+  } catch (error) {
+    console.error('Error updating learning data:', error);
+    res.status(500).json({ error: 'Failed to update learning data' });
   }
 });
 
@@ -357,6 +406,11 @@ app.get('/sessions/:sessionId/pdf', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to generate PDF' });
   }
 });
+
+// Add these with your other middleware
+app.use('/api', learningDataRouter);
+app.use('/api', framesRouter);
+app.use('/api', sessionsRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
