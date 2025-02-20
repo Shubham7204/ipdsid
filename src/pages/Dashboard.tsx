@@ -16,6 +16,7 @@ import { jsPDF } from 'jspdf';
 import { SessionHistory } from '../components/SessionHistory';
 import { LearningProgress } from '../components/LearningProgress';
 import { CombinedKnowledge } from '../components/CombinedKnowledge';
+import { FrameViewer } from '../components/FrameViewer';
 
 export function Dashboard() {
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
@@ -31,7 +32,7 @@ export function Dashboard() {
   const worker = useRef<any>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const { learningData, updateLearningData } = useLearningData();
-  const { frames = [], saveFrame } = useFrames();
+  const { frames, isLoading, error: framesError } = useFrames();
   const { currentSession, startSession, endSession, sessions, isLoading: sessionsLoading } = useSession();
 
   useEffect(() => {
@@ -336,6 +337,14 @@ ${session.report.summary}
     );
   };
 
+  if (isLoading) {
+    return <div>Loading frames...</div>;
+  }
+
+  if (framesError) {
+    return <div>Error: {framesError}</div>;
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="container mx-auto py-6 px-4">
@@ -420,37 +429,8 @@ ${session.report.summary}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {frames.map((frame, index) => (
-                  <div key={frame._id} className="border rounded-lg p-4 bg-white shadow-sm">
-                    <img
-                      src={frame.imageUrl}
-                      alt={`Frame ${index + 1}`}
-                      className="w-full h-48 object-cover rounded mb-3"
-                      loading="lazy"
-                    />
-                    <div className="space-y-2">
-                      <p className="text-sm text-gray-500">
-                        {new Date(frame.timestamp).toLocaleString()}
-                      </p>
-                      {frame.category && (
-                        <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
-                          {frame.category}
-                        </span>
-                      )}
-                      {frame.keywords && frame.keywords.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {frame.keywords.map((keyword, idx) => (
-                            <span
-                              key={idx}
-                              className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded"
-                            >
-                              {keyword}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                {frames.map((frame) => (
+                  <FrameViewer key={frame._id} frame={frame} />
                 ))}
               </div>
             </div>
