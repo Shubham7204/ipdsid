@@ -6,9 +6,7 @@ interface LearningData {
   category: string;
   keywords: string[];
   urls: string[];
-  frequency: number;
   confidence: number;
-  lastUpdated: Date;
 }
 
 export function useLearningData() {
@@ -22,39 +20,19 @@ export function useLearningData() {
       const response = await api.get('/learning-data');
       setLearningData(response.data);
     } catch (err) {
+      console.error('Failed to fetch learning data:', err);
       setError('Failed to fetch learning data');
-      console.error(err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const updateLearningData = async (analysis: SessionAnalysis) => {
+  const updateLearningData = async (data: Partial<LearningData>) => {
     try {
-      const { category, keywords, urls } = analysis;
-      const confidence = 0.8;
-
-      console.log('Sending data to server:', {
-        category,
-        keywords,
-        urls,
-        confidence,
-      });
-
-      const response = await api.post('/learning-data', {
-        category,
-        keywords,
-        urls,
-        confidence,
-      });
-
-      console.log('Server response:', response.data);
+      await api.post('/learning-data', data);
       await fetchLearningData();
     } catch (err) {
       console.error('Failed to update learning data:', err);
-      if (err.response) {
-        console.error('Server error:', err.response.data);
-      }
     }
   };
 
@@ -62,11 +40,5 @@ export function useLearningData() {
     fetchLearningData();
   }, []);
 
-  return {
-    learningData,
-    isLoading,
-    error,
-    updateLearningData,
-    refreshLearningData: fetchLearningData,
-  };
+  return { learningData, isLoading, error, updateLearningData };
 } 

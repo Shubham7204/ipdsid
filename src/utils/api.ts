@@ -1,7 +1,10 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  baseURL: '/api',  // This will be rewritten by the Vite proxy
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 // Add request interceptor to add auth token
