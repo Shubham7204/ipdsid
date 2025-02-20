@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, AlertCircle, FileText, Link2, Tag, BarChart, Database, ArrowRight, Table } from 'lucide-react';
+import { Play, Pause, AlertCircle, FileText, Link2, Tag, BarChart } from 'lucide-react';
 import { createWorker } from 'tesseract.js';
 import { captureScreen, initializeCapture } from './utils/screenCapture';
 import { processText, categories, keywordsByCategory, commonUrls } from './utils/textProcessing';
@@ -130,7 +130,6 @@ function App() {
   const renderLearningProgress = () => (
     <div className="bg-white rounded-lg shadow-lg p-6">
       <div className="flex items-center gap-2 mb-4">
-        <Database className="text-purple-500" />
         <h2 className="text-xl font-semibold">Learning Progress</h2>
       </div>
       <div className="space-y-4">
@@ -165,15 +164,25 @@ function App() {
 
   if (showDataView) {
     return (
-      <>
-        <button
-          onClick={() => setShowDataView(false)}
-          className="fixed top-4 right-4 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 shadow-md"
-        >
-          Back to Dashboard
-        </button>
+      <div>
+        <div className="bg-white shadow">
+          <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+            <button
+              onClick={() => setShowDataView(false)}
+              className="text-gray-600 hover:text-gray-900"
+            >
+              ← Back to Dashboard
+            </button>
+            <button
+              onClick={logout}
+              className="text-red-600 hover:text-red-900"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
         <DataView />
-      </>
+      </div>
     );
   }
 
@@ -191,7 +200,6 @@ function App() {
                     onClick={() => setShowDataView(true)}
                     className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600"
                   >
-                    <Table size={20} />
                     View Data Tables
                   </button>
                   <button
@@ -248,47 +256,6 @@ function App() {
                   <FileText size={20} />
                   Generate Report
                 </button>
-              </div>
-            </div>
-
-            {/* Pre-fed Data */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Database className="text-indigo-500" />
-                <h2 className="text-xl font-semibold">Pre-fed Categories & Keywords</h2>
-              </div>
-              <div className="space-y-4">
-                {categories.map((category) => (
-                  <div key={category} className="border-b border-gray-100 pb-4 last:border-b-0 last:pb-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <ArrowRight size={16} className="text-indigo-500" />
-                      <h3 className="font-medium capitalize">{category}</h3>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {keywordsByCategory[category].map((keyword) => (
-                        <span key={keyword} className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-sm">
-                          {keyword}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="mt-2 text-sm text-gray-500">
-                      <strong>Common URLs:</strong>{' '}
-                      {commonUrls[category].map((url, index) => (
-                        <React.Fragment key={url}>
-                          <a
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-indigo-600 hover:text-indigo-900"
-                          >
-                            {url}
-                          </a>
-                          {index < commonUrls[category].length - 1 && ', '}
-                        </React.Fragment>
-                      ))}
-                    </div>
-                  </div>
-                ))}
               </div>
             </div>
 
