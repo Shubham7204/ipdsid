@@ -9,14 +9,10 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useFrames } from '../hooks/useFrames';
 import { useSession } from '../hooks/useSession';
-import { api } from '../services/api';
 import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { jsPDF } from 'jspdf';
 import { SessionHistory } from '../components/SessionHistory';
-import { LearningProgress } from '../components/LearningProgress';
-import { CombinedKnowledge } from '../components/CombinedKnowledge';
-import { FrameViewer } from '../components/FrameViewer';
+import 'jspdf-autotable';
 
 export function Dashboard() {
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
@@ -71,6 +67,28 @@ export function Dashboard() {
     return analysis;
   };
 
+  const handleStartCapture = async () => {
+    try {
+      await startSession();
+      setIsCapturing(true);
+      // Additional capture logic...
+    } catch (err) {
+      setError('Failed to start capture');
+      console.error(err);
+    }
+  };
+
+  const handleStopCapture = async () => {
+    try {
+      await endSession();
+      setIsCapturing(false);
+      // Additional stop logic...
+    } catch (err) {
+      setError('Failed to stop capture');
+      console.error(err);
+    }
+  };
+
   const startCapture = async () => {
     try {
       setError('');
@@ -95,13 +113,20 @@ export function Dashboard() {
       streamRef.current = stream;
       setHasPermission(true);
       setIsCapturing(true);
-      
-      // Handle stream stop event (user clicks "Stop Sharing")
-      stream.getVideoTracks()[0].addEventListener('ended', () => {
-        stopCapture();
+
+      // Start Flask screen capture for Recent Captures
+      const response = await fetch('http://localhost:5000/api/capture/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
       });
 
-      // Start capture interval
+      if (!response.ok) {
+        throw new Error('Failed to start screen capture');
+      }
+
+      // Start capture interval for text extraction
       captureInterval.current = window.setInterval(async () => {
         if (streamRef.current && worker.current) {
           const screenshot = await captureScreen(streamRef.current);
@@ -121,45 +146,44 @@ export function Dashboard() {
           }
         }
       }, 5000);
+
     } catch (error) {
       console.error('Error starting capture:', error);
-      setError('Failed to start screen capture. Please try again.');
-      setHasPermission(false);
-      // Clean up if session was started but capture failed
-      if (currentSession) {
-        await endSession(currentSession._id, null);
-      }
+      setError('Failed to start capture');
     }
   };
 
   const stopCapture = async () => {
-    // Clear capture interval
-    if (captureInterval.current) {
-      clearInterval(captureInterval.current);
-      captureInterval.current = null;
-    }
-
-    // Stop all tracks in the stream
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
-        track.stop();
+    try {
+      // Stop Flask screen capture
+      const response = await fetch('http://localhost:5000/api/capture/stop', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
       });
-      streamRef.current = null;
-    }
 
-    // End current session if exists
-    if (currentSession) {
-      try {
-        const analysis = await processTextAndLearn(sessionData.join('\n'), null, true);
-        await endSession(currentSession._id, analysis);
-      } catch (error) {
-        console.error('Error ending session:', error);
+      if (!response.ok) {
+        throw new Error('Failed to stop screen capture');
       }
-    }
 
-    // Reset states
-    setIsCapturing(false);
-    setHasPermission(false);
+      // Clear interval and state
+      if (captureInterval.current) {
+        clearInterval(captureInterval.current);
+        captureInterval.current = null;
+      }
+
+      setIsCapturing(false);
+
+      // End the session only if we have a current session
+      if (currentSession) {
+        await endSession();
+      }
+
+    } catch (error) {
+      console.error('Error stopping capture:', error);
+      setError('Failed to stop capture');
+    }
   };
 
   const generateReport = async () => {
@@ -209,50 +233,57 @@ ${session.report.summary}
   const handleDownloadPDF = async (session: Session, filename: string) => {
     try {
       const doc = new jsPDF();
-      
-      // Add title
+
+      // Add a simple title
       doc.setFontSize(20);
-      doc.text('Session Report', 105, 20, { align: 'center' });
-      
-      // Add date
+      doc.text('Session Report', 20, 20);
+
+      // Add session date
       doc.setFontSize(12);
-      doc.text(`Date: ${new Date(session.startTime).toLocaleString()}`, 20, 40);
-      
-      let yPosition = 60;
-      
+      doc.text(`Date: ${new Date(session.startTime).toLocaleString()}`, 20, 30);
+
+      // Check if report data is available
       if (session.report) {
+        let yPosition = 40;
+
         // Add category
         doc.text(`Category: ${session.report.category}`, 20, yPosition);
         yPosition += 10;
-        
+
         // Add keywords
-        doc.text(`Keywords: ${session.report.keywords.join(', ')}`, 20, yPosition);
-        yPosition += 20;
-        
+        doc.text('Keywords:', 20, yPosition);
+        yPosition += 10;
+        session.report.keywords.forEach(keyword => {
+          doc.text(`• ${keyword}`, 30, yPosition);
+          yPosition += 7;
+        });
+
         // Add URLs
-        if (session.report.urls.length > 0) {
-          doc.text('URLs:', 20, yPosition);
+        yPosition += 10;
+        doc.text('URLs:', 20, yPosition);
+        yPosition += 10;
+        session.report.urls.forEach(url => {
+          doc.text(`• ${url}`, 30, yPosition);
+          yPosition += 7;
+        });
+
+        // Add summary
+        if (session.report.summary) {
           yPosition += 10;
-          session.report.urls.forEach(url => {
-            doc.text(`• ${url}`, 30, yPosition);
+          doc.text('Summary:', 20, yPosition);
+          yPosition += 10;
+          const splitSummary = doc.splitTextToSize(session.report.summary, 170);
+          splitSummary.forEach(line => {
+            doc.text(line, 20, yPosition);
             yPosition += 7;
           });
         }
-        
-        // Add summary
-        yPosition += 10;
-        doc.text('Summary:', 20, yPosition);
-        yPosition += 10;
-        
-        // Split long summary text into multiple lines
-        const splitSummary = doc.splitTextToSize(session.report.summary, 170);
-        doc.text(splitSummary, 20, yPosition);
       }
-      
+
       // Save the PDF
       doc.save(filename);
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      console.error('Failed to generate PDF:', error);
     }
   };
 
@@ -324,10 +355,10 @@ ${session.report.summary}
           </div>
           <button
             onClick={() => handleDownloadPDF(currentSession, `current-session-${currentSession._id}.pdf`)}
-            className="flex items-center space-x-1 text-blue-600 hover:text-blue-800 px-3 py-1 rounded-md border border-blue-600 hover:bg-blue-50"
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-bold border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,0.8)] hover:translate-y-1 hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,0.8)] transition-all"
           >
             <Download size={16} />
-            <span className="text-sm">Download PDF</span>
+            <span>Download PDF</span>
           </button>
         </div>
         <div className="prose max-w-none bg-gray-50 p-4 rounded-lg">
@@ -346,96 +377,97 @@ ${session.report.summary}
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="container mx-auto py-6 px-4">
-        {/* Screen Capture Controls */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Screen Capture</h2>
-            <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-blue-50 py-8">
+      <div className="container mx-auto px-4">
+        {/* Main Control Panel */}
+        <div className="bg-white p-8 rounded-lg shadow-[8px_8px_0px_0px_rgba(0,0,0,0.8)] border-4 border-black mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-4xl font-black text-blue-600">Activity Monitor</h1>
+            <div className="flex gap-4">
               {error && (
-                <div className="flex items-center text-red-600">
-                  <AlertCircle className="w-5 h-5 mr-2" />
-                  <span>{error}</span>
+                <div className="flex items-center gap-2 text-red-500 bg-red-50 px-4 py-2 rounded-lg border-2 border-red-500">
+                  <AlertCircle size={20} />
+                  {error}
                 </div>
               )}
+              {!isCapturing ? (
+                <button
+                  onClick={startCapture}
+                  className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-bold border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,0.8)] hover:translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,0.8)] transition-all"
+                >
+                  <Play size={20} />
+                  Start Monitoring
+                </button>
+              ) : (
+                <button
+                  onClick={stopCapture}
+                  className="flex items-center gap-2 bg-red-500 text-white px-6 py-3 rounded-lg font-bold border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,0.8)] hover:translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,0.8)] transition-all"
+                >
+                  <Pause size={20} />
+                  Stop Monitoring
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Status Card */}
+            <div className="bg-blue-50 p-6 rounded-lg border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,0.8)]">
+              <h3 className="text-2xl font-bold mb-4 text-blue-600">Status</h3>
+              <div className="flex items-center gap-2 text-lg">
+                <div className={`w-3 h-3 rounded-full ${isCapturing ? 'bg-green-500' : 'bg-gray-400'}`} />
+                {isCapturing ? 'Monitoring Active' : 'Monitoring Inactive'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Two Column Layout for Session Data and History */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Raw Session Data */}
+          <div className="bg-white p-8 rounded-lg shadow-[8px_8px_0px_0px_rgba(0,0,0,0.8)] border-4 border-black">
+            <h2 className="text-3xl font-black mb-6 text-blue-600">Raw Session Data</h2>
+            <div className="bg-blue-50 p-6 rounded-lg border-2 border-black max-h-[600px] overflow-y-auto">
+              {sessionData.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">No captures yet</p>
+              ) : (
+                sessionData.map((text, index) => (
+                  <div key={index} className="mb-4 p-4 bg-white rounded-lg border-2 border-black last:mb-0">
+                    <p className="text-sm font-bold text-blue-600 mb-2">Capture {index + 1}</p>
+                    <p className="whitespace-pre-wrap">{text}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Session History */}
+          <div className="bg-white p-8 rounded-lg shadow-[8px_8px_0px_0px_rgba(0,0,0,0.8)] border-4 border-black">
+            <h2 className="text-3xl font-black mb-6 text-blue-600">Session History</h2>
+            <div className="max-h-[600px] overflow-y-auto">
+              <SessionHistory />
+            </div>
+          </div>
+        </div>
+
+        {/* Current Session Report - Full Width */}
+        {currentSession?.report && (
+          <div className="mt-8 bg-white p-8 rounded-lg shadow-[8px_8px_0px_0px_rgba(0,0,0,0.8)] border-4 border-black">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-3xl font-black text-blue-600">Current Report</h2>
               <button
-                onClick={isCapturing ? stopCapture : startCapture}
-                className={`flex items-center px-4 py-2 rounded-lg ${
-                  isCapturing
-                    ? 'bg-red-600 hover:bg-red-700 text-white'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                }`}
+                onClick={() => handleDownloadPDF(currentSession, `current-session-${currentSession._id}.pdf`)}
+                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-bold border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,0.8)] hover:translate-y-1 hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,0.8)] transition-all"
               >
-                {isCapturing ? (
-                  <>
-                    <Pause className="w-5 h-5 mr-2" />
-                    Stop Capture
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-5 h-5 mr-2" />
-                    Start Capture
-                  </>
-                )}
+                <Download size={16} />
+                <span>Download PDF</span>
               </button>
             </div>
-          </div>
-          {isCapturing && (
-            <div className="text-sm text-gray-600">
-              Screen capture is active. Learning from your screen content...
-            </div>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column */}
-          <div className="space-y-6">
-            {/* Raw Session Data */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h2 className="text-xl font-semibold mb-4">Raw Session Data</h2>
-              <div className="bg-gray-50 p-4 rounded-lg max-h-96 overflow-y-auto">
-                {sessionData.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">No captures yet</p>
-                ) : (
-                  sessionData.map((text, index) => (
-                    <div key={index} className="mb-4 p-2 border-b border-gray-200 last:border-b-0 last:mb-0">
-                      <p className="text-sm text-gray-600">Capture {index + 1}</p>
-                      <p className="whitespace-pre-wrap">{text}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <LearningProgress />
-            <SessionHistory />
-          </div>
-
-          {/* Right Column */}
-          <div className="space-y-6">
-            <CombinedKnowledge />
-            
-            {/* Captured Frames Section */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <Image className="text-indigo-500" />
-                  Recent Captures
-                </h2>
-                <span className="text-sm text-gray-500">
-                  {frames.length} frames captured
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {frames.map((frame) => (
-                  <FrameViewer key={frame._id} frame={frame} />
-                ))}
-              </div>
+            <div className="prose max-w-none bg-blue-50 p-6 rounded-lg border-2 border-black">
+              <ReactMarkdown>{generateMarkdown(currentSession)}</ReactMarkdown>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

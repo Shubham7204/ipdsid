@@ -17,7 +17,7 @@ interface Session {
 
 export function useSession() {
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [currentSession, setCurrentSession] = useState<Session | null>(null);
+  const [currentSession, setCurrentSession] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,22 +37,22 @@ export function useSession() {
 
   const startSession = async () => {
     try {
-      const response = await api.post('/sessions/start');
-      setCurrentSession(response.data);
+      const response = await api.post('/api/sessions/start');
+      setCurrentSession(response.data._id);
       return response.data;
-    } catch (err) {
-      console.error('Failed to start session:', err);
-      throw err;
+    } catch (error) {
+      console.error('Failed to start session:', error);
+      return null;
     }
   };
 
-  const endSession = async (sessionId: string, report: any) => {
+  const endSession = async () => {
     try {
-      await api.post(`/sessions/${sessionId}/end`, { report });
+      if (!currentSession) return;
+      await api.post(`/api/sessions/${currentSession}/end`);
       setCurrentSession(null);
-      await fetchSessions();
-    } catch (err) {
-      console.error('Failed to end session:', err);
+    } catch (error) {
+      console.error('Failed to end session:', error);
     }
   };
 

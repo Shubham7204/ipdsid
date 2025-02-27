@@ -1,4 +1,3 @@
-import React from 'react';
 import { useLearningData } from '../hooks/useLearningData';
 import { Book, Link, Tag, RefreshCw } from 'lucide-react';
 
