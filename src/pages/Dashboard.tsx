@@ -155,34 +155,37 @@ export function Dashboard() {
 
   const stopCapture = async () => {
     try {
-      // Stop Flask screen capture
-      const response = await fetch('http://localhost:5000/api/capture/stop', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to stop screen capture');
-      }
-
-      // Clear interval and state
+      // Clear capture interval
       if (captureInterval.current) {
         clearInterval(captureInterval.current);
         captureInterval.current = null;
       }
 
+      // Stop media tracks
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+
       setIsCapturing(false);
 
-      // End the session only if we have a current session
-      if (currentSession) {
-        await endSession();
+      // Generate report if we have session data
+      if (currentSession && sessionData.length > 0) {
+        console.log('Generating final session report...');
+        const allText = sessionData.join('\n');
+        const analysis = await processTextAndLearn(allText, null, true);
+        
+        if (analysis) {
+          console.log('Report generated:', analysis);
+          await endSession(currentSession._id, analysis);
+        } else {
+          console.error('Failed to generate session report');
+        }
       }
 
     } catch (error) {
       console.error('Error stopping capture:', error);
-      setError('Failed to stop capture');
+      setError('Failed to stop capture properly');
     }
   };
 
@@ -190,9 +193,28 @@ export function Dashboard() {
     try {
       setError('');
       const allText = sessionData.join('\n');
+      // Add logging to debug
+      console.log('Processing text:', allText);
+      
       const analysis = await processTextAndLearn(allText, null, true);
+      console.log('Analysis result:', analysis);
+      
       if (analysis) {
-        setReport(JSON.stringify(analysis, null, 2));
+        // Make sure analysis matches SessionAnalysis interface
+        const report: SessionAnalysis = {
+          category: analysis.category || 'Unknown',
+          topics: analysis.topics || [],
+          keywords: analysis.keywords || [],
+          urls: analysis.urls || [],
+          summary: analysis.summary || ''
+        };
+        
+        // Save report to session
+        await api.post(`/api/sessions/${currentSession}/report`, report);
+        setReport(JSON.stringify(report, null, 2));
+        
+        // Refresh sessions to show new report
+        refreshSessions();
       }
     } catch (error) {
       console.error('Error generating report:', error);
@@ -208,12 +230,15 @@ export function Dashboard() {
   };
 
   const generateMarkdown = (session) => {
+    const duration = session.endTime 
+      ? Math.round((new Date(session.endTime).getTime() - new Date(session.startTime).getTime()) / 1000)
+      : Math.round((Date.now() - new Date(session.startTime).getTime()) / 1000);
+
     return `
 # Session Report - ${new Date(session.startTime).toLocaleString()}
 
 ## Overview
-- **Duration**: ${session.endTime ? `${Math.round((new Date(session.endTime).getTime() - new Date(session.startTime).getTime()) / 60000)} minutes` : 'Ongoing'}
-- **Captures**: ${session.frames.length}
+- **Duration**: ${duration} seconds
 - **Category**: ${session.report?.category || 'N/A'}
 
 ## Analysis
