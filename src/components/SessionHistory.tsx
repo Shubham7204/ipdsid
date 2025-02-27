@@ -100,38 +100,38 @@ export function SessionHistory() {
   }
 
   return (
-    <div className="space-y-6">
-      {sessions.map((session) => (
+      <div className="space-y-6">
+        {sessions.map((session) => (
         <div key={session._id} className="bg-white p-6 rounded-lg border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,0.8)]">
-          <div className="flex justify-between items-center mb-4">
-            <button
-              onClick={() => setExpandedSession(expandedSession === session._id ? null : session._id)}
-              className="flex items-center space-x-3"
-            >
-              {expandedSession === session._id ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
-              <div className="text-left">
+            <div className="flex justify-between items-center mb-4">
+              <button
+                onClick={() => setExpandedSession(expandedSession === session._id ? null : session._id)}
+                className="flex items-center space-x-3"
+              >
+                {expandedSession === session._id ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                <div className="text-left">
                 <h3 className="text-xl font-bold text-blue-600">
-                  {new Date(session.startTime).toLocaleDateString()} -{' '}
-                  {new Date(session.startTime).toLocaleTimeString()}
-                </h3>
-                {session.endTime && (
+                    {new Date(session.startTime).toLocaleDateString()} -{' '}
+                    {new Date(session.startTime).toLocaleTimeString()}
+                  </h3>
+                  {session.endTime && (
                   <p className="text-gray-600">
-                    Duration: {calculateDuration(session.startTime, session.endTime)}
-                  </p>
-                )}
-              </div>
-            </button>
-            <button
+                      Duration: {calculateDuration(session.startTime, session.endTime)}
+                    </p>
+                  )}
+                </div>
+              </button>
+                <button
               onClick={() => handleDownloadPDF(session)}
               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-bold border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,0.8)] hover:translate-y-1 hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,0.8)] transition-all"
-            >
-              <Download size={16} />
+                >
+                  <Download size={16} />
               <span>PDF</span>
-            </button>
-          </div>
+                </button>
+            </div>
 
-          {expandedSession === session._id && (
-            <div className="mt-6">
+            {expandedSession === session._id && (
+              <div className="mt-6">
               {!session.report ? (
                 <div className="bg-yellow-50 p-4 rounded-lg border-2 border-yellow-500">
                   <p className="text-yellow-700">Report generation in progress...</p>
@@ -146,11 +146,11 @@ export function SessionHistory() {
                     <div className="bg-white p-4 rounded-lg border-2 border-black">
                       <span className="text-gray-600">Category</span>
                       <p className="font-bold mt-1">{session.report.category}</p>
-                    </div>
+                          </div>
                     <div className="bg-white p-4 rounded-lg border-2 border-black">
                       <span className="text-gray-600">Keywords</span>
                       <p className="font-bold mt-1">{session.report.keywords.join(', ')}</p>
-                    </div>
+                          </div>
                     <div className="bg-white p-4 rounded-lg border-2 border-black">
                       <span className="text-gray-600">URLs</span>
                       <p className="font-bold mt-1">{session.report.urls.join(', ')}</p>
@@ -162,12 +162,12 @@ export function SessionHistory() {
                       <p className="mt-2">{session.report.summary}</p>
                     </div>
                   )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
     </div>
   );
 } 
