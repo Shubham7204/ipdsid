@@ -154,8 +154,8 @@ export function SessionHistory() {
                     <div className="bg-white p-4 rounded-lg border-2 border-black">
                       <span className="text-gray-600">URLs</span>
                       <p className="font-bold mt-1">{session.report.urls.join(', ')}</p>
-                    </div>
-                  </div>
+                          </div>
+                        </div>
                   {session.report.summary && (
                     <div className="mt-4 bg-white p-4 rounded-lg border-2 border-black">
                       <span className="text-gray-600">Summary</span>

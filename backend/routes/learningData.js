@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
 import LearningData from '../models/LearningData.js';
+import mongoose from 'mongoose';
 
 const router = express.Router();
 
@@ -133,22 +134,24 @@ router.post('/learning-data/update', authenticateToken, async (req, res) => {
 // Get combined knowledge view
 router.get('/learning-data/combined', authenticateToken, async (req, res) => {
   try {
-    const learningData = await LearningData.findOne({ userId: req.user._id });
+    // Get base learning data
+    let learningData = await LearningData.findOne({ userId: req.user._id });
     
     if (!learningData) {
-      return res.json({
-        categories: [],
-        keywords: [],
-        urls: [],
-        stats: {
-          totalCategories: 0,
-          totalKeywords: 0,
-          totalUrls: 0,
-          lastUpdated: null
-        }
+      learningData = new LearningData({ 
+        userId: req.user._id,
+        categories: new Map(),
+        keywords: new Map(),
+        urls: new Map()
       });
+      await learningData.save();
     }
-
+    
+    // Get all sessions for this user
+    const Session = mongoose.model('Session');
+    const sessions = await Session.find({ userId: req.user._id });
+    
+    // Create combined data structure
     const combinedData = {
       categories: Array.from(learningData.categories.entries()).map(([name, data]) => ({
         name,
@@ -177,7 +180,60 @@ router.get('/learning-data/combined', authenticateToken, async (req, res) => {
         lastUpdated: learningData.lastUpdated
       }
     };
-
+    
+    // Add data from sessions if not already included
+    sessions.forEach(session => {
+      if (session.report) {
+        // Add category if not exists
+        const existingCategory = combinedData.categories.find(c => c.name === session.report.category);
+        if (!existingCategory && session.report.category) {
+          combinedData.categories.push({
+            name: session.report.category,
+            count: 1,
+            lastSeen: session.endTime || session.startTime,
+            relatedKeywords: session.report.keywords || []
+          });
+        }
+        
+        // Add keywords if not exists
+        if (session.report.keywords) {
+          session.report.keywords.forEach(keyword => {
+            const existingKeyword = combinedData.keywords.find(k => k.keyword === keyword);
+            if (!existingKeyword) {
+              combinedData.keywords.push({
+                keyword,
+                count: 1,
+                category: session.report.category,
+                importance: 5,
+                lastSeen: session.endTime || session.startTime
+              });
+            }
+          });
+        }
+        
+        // Add URLs if not exists
+        if (session.report.urls) {
+          session.report.urls.forEach(url => {
+            const existingUrl = combinedData.urls.find(u => u.url === url);
+            if (!existingUrl) {
+              combinedData.urls.push({
+                url,
+                visits: 1,
+                category: session.report.category,
+                safetyRating: 'safe',
+                lastVisited: session.endTime || session.startTime
+              });
+            }
+          });
+        }
+      }
+    });
+    
+    // Update final stats
+    combinedData.stats.totalCategories = combinedData.categories.length;
+    combinedData.stats.totalKeywords = combinedData.keywords.length;
+    combinedData.stats.totalUrls = combinedData.urls.length;
+    
     res.json(combinedData);
   } catch (error) {
     console.error('Error fetching combined learning data:', error);

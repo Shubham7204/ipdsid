@@ -1,9 +1,41 @@
 import { useState, useEffect } from 'react';
 import api from '../utils/api';
 
+interface Category {
+  name: string;
+  count: number;
+  lastSeen: string;
+  relatedKeywords: string[];
+}
+
+interface Keyword {
+  keyword: string;
+  count: number;
+  category: string;
+  importance: number;
+  lastSeen: string;
+}
+
+interface Url {
+  url: string;
+  visits: number;
+  category: string;
+  safetyRating: string;
+  lastVisited: string;
+}
+
+interface Stats {
+  totalCategories: number;
+  totalKeywords: number;
+  totalUrls: number;
+  lastUpdated: string;
+}
+
 interface LearningData {
-  categories: { [key: string]: number };
-  keywords: { [key: string]: number };
+  categories: Category[];
+  keywords: Keyword[];
+  urls: Url[];
+  stats: Stats;
   lastUpdated: string;
 }
 
@@ -18,12 +50,18 @@ export function useLearningData() {
       setError(null);
       const response = await api.get('/api/learning-data/combined');
       
+      // Make sure we're properly transforming the data for the frontend
       const transformedData = {
-        categories: response.data.categories.sort((a, b) => b.count - a.count),
-        keywords: response.data.keywords.sort((a, b) => b.count - a.count),
-        urls: response.data.urls.sort((a, b) => b.visits - a.visits),
-        stats: response.data.stats,
-        lastUpdated: response.data.stats.lastUpdated
+        categories: response.data.categories.sort((a, b) => b.count - a.count) || [],
+        keywords: response.data.keywords.sort((a, b) => b.count - a.count) || [],
+        urls: response.data.urls.sort((a, b) => b.visits - a.visits) || [],
+        stats: response.data.stats || {
+          totalCategories: 0,
+          totalKeywords: 0,
+          totalUrls: 0,
+          lastUpdated: new Date().toISOString()
+        },
+        lastUpdated: response.data.stats?.lastUpdated || new Date().toISOString()
       };
       
       setLearningData(transformedData);
@@ -46,6 +84,7 @@ export function useLearningData() {
 
   useEffect(() => {
     fetchLearningData();
+    // Refresh data every minute
     const interval = setInterval(fetchLearningData, 60000);
     return () => clearInterval(interval);
   }, []);
@@ -57,4 +96,4 @@ export function useLearningData() {
     updateLearningData,
     refetch: fetchLearningData
   };
-} 
+}

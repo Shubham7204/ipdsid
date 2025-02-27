@@ -6,16 +6,17 @@ import { categories, commonUrls, keywordsByCategory } from '../utils/textProcess
 export function DataOverview() {
   const { learningData, isLoading, error } = useLearningData();
 
-  // Prepare pre-fed data
-  const preFedHeaders = ['Category', 'Keywords', 'URLs'];
+  const headers = ['Category', 'Keywords', 'URLs', 'Frequency'];
+
+  // Pre-fed knowledge rows
   const preFedRows = categories.map(category => [
     category,
     keywordsByCategory[category].join(', '),
-    commonUrls[category].join(', ')
+    commonUrls[category].join(', '),
+    '0'
   ]);
 
-  // Prepare learned data
-  const learnedHeaders = ['Category', 'Keywords', 'URLs', 'Frequency'];
+  // Learned knowledge rows with proper data mapping
   const learnedRows = learningData ? 
     learningData.categories.map(cat => {
       const categoryKeywords = learningData.keywords
@@ -36,8 +37,7 @@ export function DataOverview() {
       ];
     }) : [];
 
-  // Prepare combined data
-  const combinedHeaders = ['Category', 'All Keywords', 'All URLs', 'Frequency'];
+  // Combined knowledge rows
   const combinedRows = categories.map(category => {
     const categoryData = learningData?.categories.find(c => c.name === category);
     const frequency = categoryData?.count || 0;
@@ -70,7 +70,7 @@ export function DataOverview() {
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow-lg p-6">
+      <div className="bg-white p-8 rounded-lg border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,0.8)]">
         <div className="text-center py-4">Loading data...</div>
       </div>
     );
@@ -78,29 +78,29 @@ export function DataOverview() {
 
   if (error) {
     return (
-      <div className="bg-white rounded-lg shadow-lg p-6">
-        <div className="text-center py-4 text-red-600">Error loading data</div>
+      <div className="bg-white p-8 rounded-lg border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,0.8)]">
+        <div className="text-center py-4 text-red-600">{error}</div>
       </div>
     );
   }
 
   return (
     <div className="space-y-8">
-      <div>
-        <h3 className="text-lg font-medium mb-4">Pre-fed Knowledge</h3>
-        <DataTable headers={preFedHeaders} rows={preFedRows} />
+      <div className="bg-white p-8 rounded-lg border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,0.8)]">
+        <h3 className="text-2xl font-black text-blue-600 mb-6">Pre-fed Knowledge</h3>
+        <DataTable headers={headers} rows={preFedRows} />
       </div>
 
       {learningData && (
-        <div>
-          <h3 className="text-lg font-medium mb-4">Learned Knowledge</h3>
-          <DataTable headers={learnedHeaders} rows={learnedRows} />
+        <div className="bg-white p-8 rounded-lg border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,0.8)]">
+          <h3 className="text-2xl font-black text-blue-600 mb-6">Learned Knowledge</h3>
+          <DataTable headers={headers} rows={learnedRows} />
         </div>
       )}
 
-      <div>
-        <h3 className="text-lg font-medium mb-4">Combined Knowledge</h3>
-        <DataTable headers={combinedHeaders} rows={combinedRows} />
+      <div className="bg-white p-8 rounded-lg border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,0.8)]">
+        <h3 className="text-2xl font-black text-blue-600 mb-6">Combined Knowledge</h3>
+        <DataTable headers={headers} rows={combinedRows} />
       </div>
     </div>
   );
