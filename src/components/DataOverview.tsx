@@ -39,11 +39,11 @@ export function DataOverview() {
 
   // Combined knowledge rows
   const combinedRows = categories.map(category => {
-    const categoryData = learningData?.categories.find(c => c.name === category);
+    const categoryData = learningData?.categories?.find(c => c.name === category);
     const frequency = categoryData?.count || 0;
     
     const learnedKeywords = learningData?.keywords
-      .filter(k => k.category === category)
+      ?.filter(k => k.category === category)
       .map(k => k.keyword) || [];
     
     const allKeywords = new Set([
@@ -52,7 +52,7 @@ export function DataOverview() {
     ]);
 
     const learnedUrls = learningData?.urls
-      .filter(u => u.category === category)
+      ?.filter(u => u.category === category)
       .map(u => u.url) || [];
 
     const allUrls = new Set([
@@ -104,4 +104,4 @@ export function DataOverview() {
       </div>
     </div>
   );
-} 
+}

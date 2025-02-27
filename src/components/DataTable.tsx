@@ -27,46 +27,51 @@ export function DataTable({ headers, rows }: DataTableProps) {
           href={content}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-600 hover:underline"
+          className="inline-block bg-blue-50 px-2 py-1 rounded-md border-2 border-black text-blue-600 hover:bg-blue-100 transition-colors text-xs font-medium shadow-[2px_2px_0px_0px_rgba(0,0,0,0.8)] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,0.8)]"
         >
           {new URL(content).hostname}
         </a>
       );
     }
-    return content;
+    return (
+      <span className="inline-block bg-gray-50 px-2 py-1 rounded-md border-2 border-black text-xs font-medium shadow-[2px_2px_0px_0px_rgba(0,0,0,0.8)]">
+        {content}
+      </span>
+    );
   };
 
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
+    <div className="overflow-x-auto rounded-lg border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,0.8)]">
+      <table className="min-w-full">
         <thead>
-          <tr>
+          <tr className="bg-blue-600 text-white border-b-4 border-black">
             {headers.map((header, idx) => (
               <th
                 key={idx}
-                className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider"
+                className="px-4 py-3 text-left text-xs font-black uppercase tracking-wider"
               >
                 {header}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="bg-white divide-y-2 divide-black">
           {rows.map((row, rowIdx) => (
-            <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+            <tr key={rowIdx} className="hover:bg-blue-50 transition-colors">
               {row.map((cell, cellIdx) => (
                 <td 
                   key={`${rowIdx}-${cellIdx}`}
-                  className="px-4 py-3 text-sm text-gray-900 whitespace-normal break-words"
+                  className="px-4 py-3 text-sm whitespace-normal break-words"
                 >
-                  {cell.includes(',') 
-                    ? cell.split(',').map((item, i) => (
-                        <span key={i}>
-                          {i > 0 && ', '}
-                          {renderCell(item.trim())}
-                        </span>
-                      ))
-                    : renderCell(cell)}
+                  <div className="flex flex-wrap gap-2">
+                    {cell.includes(',') 
+                      ? cell.split(',').map((item, i) => (
+                          <span key={i}>
+                            {renderCell(item.trim())}
+                          </span>
+                        ))
+                      : renderCell(cell)}
+                  </div>
                 </td>
               ))}
             </tr>
