@@ -37,7 +37,7 @@ export function AuthForm() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md border-4 border-black">
         <h2 className="text-2xl font-bold mb-6 text-center">
           {isLogin ? 'Login' : 'Register'}
         </h2>
